@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hệ thống báo cháy - ESP32</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --line:#334155;
+    --txt:#e2e8f0; --muted:#94a3b8;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+    gap:10px;padding:14px 24px;background:#111c33;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:19px}
+  header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  main{max-width:1150px;margin:0 auto;padding:20px}
+  #banner{padding:14px 18px;border-radius:10px;font-size:16px;font-weight:600;
+    text-align:center;margin-bottom:12px;border:1px solid var(--line)}
+  .ok{background:#052e16;border-color:var(--ok)!important;color:#86efac}
+  .warn{background:#3b2503;border-color:var(--warn)!important;color:#fcd34d}
+  .bad{background:#450a0a;border-color:var(--bad)!important;color:#fca5a5;animation:pulse 1s infinite}
+  .gray{background:#1e293b;color:var(--muted)}
+  @keyframes pulse{50%{opacity:.65}}
+  .manual-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:10px 14px;margin-bottom:16px;font-size:14px}
+  .manual-bar .state{flex:1;min-width:200px}
+  .btn{border:0;border-radius:8px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn-red{background:#dc2626;color:#fff}
+  .btn-red[disabled]{background:#4b1010;color:#9f5555;cursor:not-allowed}
+  .btn-green{background:#16a34a;color:#fff}
+  .btn-green[disabled]{background:#14351f;color:#4d7a5b;cursor:not-allowed}
+  .btn-blue{background:#2563eb;color:#fff}
+  .btn-gray{background:var(--line);color:var(--muted)}
+  .btn-small{padding:4px 9px;font-size:12px;border-radius:6px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px}
+  .card,.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card .label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .card .value{font-size:30px;font-weight:700;margin-top:6px}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:18px}
+  .panel h2{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:600}
+  canvas{width:100%;height:220px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  th{color:var(--muted);font-weight:600}
+  td .btn{margin-left:4px}
+  .mono{font-family:Consolas,monospace}
+  .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}
+  .b-NORMAL{background:#052e16;color:#86efac}
+  .b-WARNING{background:#3b2503;color:#fcd34d}
+  .b-ALARM{background:#450a0a;color:#fca5a5}
+  .b-ON{background:#052e16;color:#86efac}
+  .b-OFF{background:#3b2503;color:#fcd34d}
+  .addrow{display:flex;gap:8px;margin-bottom:10px}
+  .addrow input{flex:1;padding:8px 10px;border-radius:7px;border:1px solid var(--line);
+    background:#0f172a;color:var(--txt);font-size:13px}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:18px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:14px}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;
+      align-items:center;justify-content:center;z-index:60;padding:18px}
+    .modal .mbox{background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:20px;width:100%;max-width:430px}
+    .modal h3{margin:0 0 6px;font-size:17px;color:var(--txt)}
+    .modal .mtip{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+    .modal .mkey{background:#0b1220;border:1px dashed var(--blue);padding:14px;
+      border-radius:9px;font-family:Consolas,monospace;font-size:15px;color:#86efac;
+      word-break:break-all;-webkit-user-select:all;user-select:all;
+      -webkit-tap-highlight-color:transparent}
+    .modal .macts{display:flex;gap:9px;margin-top:14px}
+    .modal .macts .btn{flex:1}
+    .modal .mmsg{min-height:18px;font-size:13px;color:#86efac;text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔥 Hệ thống báo cháy — ESP32</h1>
+  <div class="right">
+    <span id="clock">--:--:--</span>
+    <span id="conn">● kết nối...</span>
+    <span>👤 {{ user }}</span>
+        <button class="btn btn-gray btn-small" id="beepBtn" onclick="beepSetup()">🔔 Bật chuông</button>
+        <button class="btn btn-blue btn-small" onclick="sendReport()">📤 Báo cáo Telegram</button>
+    <a href="/logout"><button class="btn btn-gray btn-small">Đăng xuất</button></a>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="gray">Đang tải dữ liệu từ server...</div>
+
+  <div class="manual-bar">
+    <span class="state" id="manualState">Trạng thái báo cháy thủ công: <b>tắt</b></span>
+    <button class="btn btn-red" id="btnManualOn" onclick="manual('on')">🚨 BẬT BÁO CHÁY THỦ CÔNG</button>
+    <button class="btn btn-green" id="btnManualAck" onclick="manual('ack')">⏹ NGỪNG / CHẶN (ACK)</button>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">🌡️ Nhiệt độ</div>
+      <div class="value" id="v-temp">--</div>
+      <div class="sub">Cảm biến DHT11</div>
+    </div>
+    <div class="card">
+      <div class="label">💧 Độ ẩm</div>
+      <div class="value" id="v-humi">--</div>
+      <div class="sub">Cảm biến DHT11</div>
+    </div>
+    <div class="card">
+      <div class="label">🔥 Cảm biến lửa</div>
+      <div class="value" id="v-flame">--</div>
+      <div class="sub" id="s-flame">ADC 0–4095</div>
+    </div>
+    <div class="card">
+      <div class="label">💨 Khói (MQ2)</div>
+      <div class="value" id="v-smoke">--</div>
+      <div class="sub" id="s-smoke">ADC 0–4095</div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <h2>Nhiệt độ & độ ẩm (60 mẫu gần nhất)</h2>
+      <canvas id="chart1"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Khói & lửa (60 mẫu gần nhất)</h2>
+      <canvas id="chart2"></canvas>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:14px">
+    <h2>📊 Thống kê hôm nay</h2>
+    <div class="stats" id="stats">--</div>
+  </div>
+
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="panel">
+      <h2>📡 Thiết bị (multi-device)</h2>
+      <div class="addrow">
+        <input id="newDevName" placeholder="Tên thiết bị mới (ví dụ: Tầng 2)">
+        <button class="btn btn-blue btn-small" onclick="addDevice()">＋ Thêm</button>
+      </div>
+      <table>
+        <thead><tr><th>Thiết bị</th><th>Tên</th><th>API key</th><th>Trạng thái</th><th>Seen gần nhất</th></tr></thead>
+        <tbody id="devBody"><tr><td colspan="5">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>📜 Nhật ký hoạt động</h2>
+      <table>
+        <thead><tr><th>Thời gian</th><th>Người</th><th>Hành động</th></tr></thead>
+        <tbody id="evBody"><tr><td colspan="3">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>📋 10 dữ liệu mới nhất (JSON từ server)</h2>
+    <table>
+      <thead>
+        <tr><th>Thời gian</th><th>Thiết bị</th><th>Nhiệt độ</th><th>Độ ẩm</th>
+            <th>Lửa</th><th>Khói</th><th>Trạng thái</th></tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="7" style="text-align:center">Chưa có dữ liệu</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Modal hiển thị API key để sao chép -->
+<div class="modal" id="keyModal" style="display:none">
+  <div class="mbox">
+    <h3 id="kmTitle">API key</h3>
+    <div class="mtip">Sao chép key này vào hằng <b>API_KEY</b> trong file <b>.ino</b> rồi nạp lại ESP32. Nhấn giữ lên ô key bên dưới để chọn / sao chép thủ công nếu nút không hoạt động.</div>
+    <div class="mkey" id="kmVal"></div>
+    <div class="macts">
+      <button class="btn btn-blue" onclick="copyKey()">📋 Sao chép</button>
+      <button class="btn btn-gray" onclick="closeKey()">Đóng</button>
+    </div>
+    <div class="mmsg" id="kmMsg"></div>
+  </div>
+</div>
+
+<footer>Đồ án tốt nghiệp · ESP32 + MQ2 + DHT11 + cảm biến lửa · Server Python (Flask) · Dữ liệu JSON · Telegram Webhook</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let beepOn = false, audioCtx = null, manualOn = false, alarmWasOn = false, me = 401;
+
+async function jfetch(url, opt) {
+  const r = await fetch(url, opt);
+  if (r.status === 401) { location.href = '/login'; throw new Error('401'); }
+  return r;
+}
+
+setInterval(() => $('clock').textContent = new Date().toLocaleTimeString('vi-VN'), 1000);
+
+// ------------------- Bao chay thu cong / ACK -------------------
+async function manual(action) {
+  const ask = action === 'on'
+    ? 'XÁC NHẬN bật BÁO CHÁY THỦ CÔNG?\nCòi + bơm sẽ kích hoạt trên thiết bị.'
+    : 'XÁC NHẬN NGỪNG / CHẶN báo cháy?\nMọi kích hoạt thủ công sẽ bị tắt.';
+  if (!confirm(ask)) return;
+  try {
+    const r = await jfetch('/api/manual', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action})
+    });
+    const j = await r.json();
+    manualOn = !!j.manual_alarm;
+    refreshState();
+  } catch (e) { /* da redirect */ }
+}
+
+async function sendReport() {
+  try {
+    const r = await jfetch('/api/report', {method: 'POST'});
+    const j = await r.json();
+    alert(j.status === 'ok' ? 'Đã gửi báo cáo CSV qua Telegram!'
+          : 'Không gửi được: ' + (j.error || j.status));
+  } catch (e) { /* da redirect */ }
+}
+
+async function refreshState() {
+  try {
+    const j = await (await jfetch('/api/state')).json();
+    manualOn = !!j.manual_alarm;
+    $('manualState').innerHTML = 'Trạng thái báo cháy thủ công: <b>'
+      + (manualOn ? '<span style="color:#fca5a5">ĐANG BẬT</span>' : 'tắt') + '</b>';
+    $('btnManualOn').disabled = manualOn;
+    $('btnManualAck').disabled = !manualOn;
+    if (j.devices) renderDevices(j.devices);
+    updateBanner(j);
+    return j;
+  } catch (e) { return null; }
+}
+
+// ------------------- Banner + cuong bao -------------------
+const TXT = {
+  NORMAL:  ['ok',   '✅ AN TOAN — Không phát hiện nguy cơ cháy'],
+  WARNING: ['warn', '⚠️ CẢNH BÁO — Có dấu hiệu bất thường (khói/nhiệt độ cao)'],
+  ALARM:   ['bad',  '🚨 BÁO CHÁY — Còi & bơm đã kích hoạt!']
+};
+let lastState = null;
+
+function setBanner(cls, text) {
+  const b = $('banner'); b.className = cls; b.textContent = text;
+}
+
+function updateBanner(st) {
+  if (manualOn && lastState) {
+    setBanner('bad', `🚨 BÁO CHÁY THỦ CÔNG (bật bởi người dùng) · thiết bị: ${lastState.device_id} · ${lastState.ts}`);
+    return;
+  }
+  if (!lastState) return;
+  const [cls, text] = TXT[lastState.state] || TXT.NORMAL;
+  setBanner(cls, `${text}  ·  thiết bị: ${lastState.device_id}  ·  ${lastState.ts}`);
+}
+
+async function refreshLatest() {
+  try {
+    const r = await jfetch('/api/latest');
+    $('conn').textContent = '● kết nối OK';
+    if (r.status === 404) { setBanner('gray', 'Chưa có dữ liệu nào từ thiết bị'); return; }
+    const d = (await r.json()).data;
+    lastState = d;
+
+    $('v-temp').textContent = d.temperature.toFixed(1) + '°C';
+    $('v-humi').textContent = d.humidity.toFixed(1) + '%';
+    $('v-flame').textContent = d.flame;
+    $('v-smoke').textContent = d.smoke;
+    $('s-flame').textContent = d.flame_detected ? '🔴 Có lửa' : '🟢 Không phát hiện lửa';
+    $('s-smoke').textContent = 'Mức ADC · ngưỡng báo 2800';
+    document.title = (d.alarm || manualOn ? '🚨 ' : '') + 'Hệ thống báo cháy - ESP32';
+
+    const alarmaOn = !!d.alarm || manualOn;
+    if (alarmaOn) {
+      if (beepOn && !alarmWasOn) { beep(950); setTimeout(() => beep(950), 300); }
+      else if (beepOn) beep(950, 120);
+    }
+    alarmWasOn = alarmaOn;
+  } catch (e) {
+    $('conn').textContent = '● mất kết nối server';
+  }
+}
+
+function beepSetup() {
+  beepOn = !beepOn;
+  $('beepBtn').textContent = beepOn ? '🔔 Chuông đang bật' : '🔔 Bật chuông';
+  $('beepBtn').classList.toggle('btn-blue', beepOn);
+  if (beepOn) beep();
+}
+
+// ------------------- Cuong bao web -------------------
+function beep(freq = 880, ms = 180) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.frequency.value = freq; o.type = 'square';
+  g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + ms / 1000);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + ms / 1000);
+}
+
+// ------------------- Bieu do + bang du lieu -------------------
+async function refreshHistory() {
+  let rows = [];
+  try {
+    rows = (await (await jfetch('/api/history?limit=60')).json()).data;
+  } catch (e) { return; }
+
+  const latest = rows.slice(-10).reverse();
+  $('tbody').innerHTML = latest.length === 0
+    ? '<tr><td colspan="7" style="text-align:center">Chưa có dữ liệu</td></tr>'
+    : latest.map(r => `<tr>
+        <td>${r.ts.replace('T', ' ')}</td>
+        <td>${r.device_id}</td>
+        <td>${r.temperature.toFixed(1)} °C</td>
+        <td>${r.humidity.toFixed(1)} %</td>
+        <td>${r.flame}</td>
+        <td>${r.smoke}</td>
+        <td style="text-align:right"><span class="badge b-${r.state}">${r.state}</span></td>
+      </tr>`).join('');
+
+  drawChart('chart1', [
+    { label: 'Nhiệt độ °C', color: '#f97316', data: rows.map(r => r.temperature) },
+    { label: 'Độ ẩm %',     color: '#38bdf8', data: rows.map(r => r.humidity) }
+  ], rows.map(r => r.ts.slice(11, 16)));
+
+  drawChart('chart2', [
+    { label: 'Khói (ADC)', color: '#a78bfa', data: rows.map(r => r.smoke) },
+    { label: 'Lửa (ADC)', color: '#ef4444', data: rows.map(r => r.flame) }
+  ], rows.map(r => r.ts.slice(11, 16)));
+}
+
+function drawChart(id, series, labels) {
+  const cv = $(id), ctx = cv.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth * dpr, H = 220 * dpr;
+  cv.width = W; cv.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  const pts = series.flatMap(s => s.data);
+  if (pts.length < 2) {
+    ctx.fillStyle = '#94a3b8'; ctx.font = `${13 * dpr}px Segoe UI`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Chưa đủ dữ liệu để vẽ biểu đồ', W / 2, H / 2);
+    return;
+  }
+
+  const padL = 46 * dpr, padR = 12 * dpr, padT = 24 * dpr, padB = 26 * dpr;
+  let min = Math.min(...pts), max = Math.max(...pts);
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  const x = i => padL + (W - padL - padR) * i / (pts.length - 1);
+  const y = v => padT + (H - padT - padB) * (1 - (v - min) / span);
+
+  ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#94a3b8'; ctx.font = `${10 * dpr}px Segoe UI`;
+  ctx.textAlign = 'right';
+  for (let g = 0; g <= 4; g++) {
+    const val = min + span * g / 4, yy = y(val);
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+    ctx.fillText(val.toFixed(1), padL - 6 * dpr, yy + 3 * dpr);
+  }
+
+  ctx.textAlign = 'center';
+  [0, Math.floor((pts.length - 1) / 2), pts.length - 1].forEach(i => {
+    ctx.fillText(labels[i] || '', x(i), H - padB + 14 * dpr);
+  });
+
+  series.forEach((s, si) => {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    s.data.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+    ctx.stroke();
+    ctx.fillStyle = s.color; ctx.textAlign = 'left';
+    ctx.font = `bold ${11 * dpr}px Segoe UI`;
+    const li = si * 90 * dpr;
+    ctx.fillRect(padL + li, 4 * dpr, 10 * dpr, 10 * dpr);
+    ctx.fillText(s.label, padL + li + 14 * dpr, 13 * dpr);
+  });
+}
+
+// ------------------- Thong ke, thiet bi, nhat ky -------------------
+async function refreshStats() {
+  try {
+    const d = (await (await jfetch('/api/stats')).json()).data;
+    $('stats').innerHTML = [
+      `Số mẫu hôm nay: <b>${d.samples || 0}</b>`,
+      `Nhiệt độ TB: <b>${(d.avg_temp || 0).toFixed(1)} °C</b>`,
+      `Min/Max: <b>${(d.min_temp ?? 0).toFixed(1)} / ${(d.max_temp ?? 0).toFixed(1)} °C</b>`,
+      `Khói max: <b>${d.max_smoke || 0}</b>`,
+      `Lửa max: <b>${d.max_flame || 0}</b>`,
+      `Số lần báo cháy: <b>${d.alarm_count || 0}</b>`
+    ].join(' &nbsp;·&nbsp; ');
+  } catch (e) {}
+}
+
+function maskKey(k) { return k ? k.slice(0, 6) + '…' + k.slice(-4) : '—'; }
+
+function renderDevices(devs) {
+  if (!devs.length) { $('devBody').innerHTML = '<tr><td colspan="5">Chưa có thiết bị</td></tr>'; return; }
+  $('devBody').innerHTML = devs.map(d => `<tr>
+    <td class="mono">${d.device_id}</td>
+    <td>${d.name || ''}</td>
+    <td class="mono">${d.api_key ? maskKey(d.api_key) : '—'}</td>
+    <td><span class="badge ${d.active ? 'b-ON' : 'b-OFF'}">${d.active ? 'BẬT' : 'TẮT'}</span></td>
+    <td>${d.last_seen || 'chưa thấy'}</td>
+  </tr>
+  <tr style="border:0">
+    <td style="padding-top:0;padding-bottom:10px">
+          <button class="btn btn-blue btn-small" onclick="showKey('🔑 API key — ${d.device_id}', '${d.api_key}')">Xem key</button>
+          <button class="btn btn-gray btn-small" onclick="toggleDevice('${d.device_id}')">Bật/tắt</button>
+      <button class="btn btn-gray btn-small" onclick="regenDevice('${d.device_id}')">Sinh lại API key</button>
+      <button class="btn btn-gray btn-small" onclick="delDevice('${d.device_id}')">Xoá</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function addDevice() {
+  const name = $('newDevName').value.trim();
+  if (!name) { alert('Nhập tên thiết bị trước'); return; }
+  try {
+    const r = await jfetch('/api/devices', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name})
+    });
+    const j = await r.json();
+    $('newDevName').value = '';
+    refreshState();
+    showKey(`✅ Đã tạo thiết bị ${j.data.device_id}`, j.data.api_key);
+  } catch (e) {}
+}
+
+// ------------------- Modal sao chép API key -------------------
+function showKey(title, key) {
+  $('kmTitle').textContent = title;
+  $('kmVal').textContent = key;
+  $('kmMsg').textContent = '';
+  $('keyModal').style.display = 'flex';
+}
+function closeKey() {
+  $('keyModal').style.display = 'none';
+}
+async function copyKey() {
+  const v = $('kmVal').textContent;
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(v);
+      ok = true;
+    }
+  } catch (e) { /* fallback ben duoi */ }
+  if (!ok) {   // HTTP khong phai secure context hoac iOS cu -> execCommand
+    const ta = document.createElement('textarea');
+    ta.value = v;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, v.length);
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+  }
+  $('kmMsg').textContent = ok ? '✔ Đã sao chép vào clipboard'
+                               : '⚠ Không copy tự động — nhấn giữ ô key phía trên để chọn';
+}
+
+async function toggleDevice(id) {
+  await jfetch('/api/devices/' + id + '/toggle', {method: 'POST'});
+  refreshState();
+}
+
+async function regenDevice(id) {
+  if (!confirm('Sinh lại API key cho ' + id + '? ESP32 cũ sẽ mất kết nối tới khi bạn cập nhật .ino.')) return;
+  try {
+    const r = await jfetch('/api/devices/' + id + '/regen', {method: 'POST'});
+    const j = await r.json();
+    refreshState();
+    showKey(`🔑 API key mới của ${id}`, j.data.api_key);
+  } catch (e) {}
+}
+
+async function delDevice(id) {
+  if (!confirm('Xoá thiết bị ' + id + '?')) return;
+  await jfetch('/api/devices/' + id + '/delete', {method: 'POST'});
+  refreshState();
+}
+
+const ACT = {
+  dang_nhap:'Đăng nhập', dang_xuat:'Đăng xuất',
+  bao_chay_thu_cong:'🚨 Bật báo cháy thủ công',
+  ngung_kich_hoat_ack:'⏹ Ngừng/Chặn (ACK)',
+  them_thiet_bi:'Thêm thiết bị', bat_tat_thiet_bi:'Bật/tắt thiết bị',
+  sinh_lai_api_key:'Sinh lại API key', xoa_thiet_bi:'Xoá thiết bị',
+  gui_bao_cao_telegram:'Gửi báo cáo Telegram'
+};
+
+async function refreshEvents() {
+  try {
+    const rows = (await (await jfetch('/api/events?limit=25')).json()).data;
+    $('evBody').innerHTML = !rows.length
+      ? '<tr><td colspan="3">Chưa có hoạt động</td></tr>'
+      : rows.map(e => `<tr>
+          <td>${e.ts.replace('T', ' ')}</td>
+          <td>${e.actor}</td>
+          <td style="text-align:left">${ACT[e.action] || e.action}${e.detail ? ' <span style="color:#94a3b8">(' + e.detail + ')</span>' : ''}</td>
+        </tr>`).join('');
+  } catch (e) {}
+}
+
+refreshLatest(); refreshState(); refreshHistory(); refreshStats(); refreshEvents();
+setInterval(refreshLatest, 3000);
+setInterval(refreshState, 3000);
+setInterval(refreshHistory, 10000);
+setInterval(refreshStats, 15000);
+setInterval(refreshEvents, 15000);
+window.addEventListener('resize', refreshHistory);
+</script>
+</body>
+</html>

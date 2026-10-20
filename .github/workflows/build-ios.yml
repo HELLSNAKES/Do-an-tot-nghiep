@@ -1,0 +1,50 @@
+name: Build iOS (Capacitor)
+
+on:
+  push:
+    paths:
+      - "mobile_app/**"
+      - ".github/workflows/build-ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile_app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile_app/package-lock.json
+
+      - name: Cai dependency
+        run: npm ci
+
+      - name: Sync web vao iOS (copy www + pod install)
+        run: npx cap sync ios
+
+      - name: Build .app (khong ky chu ky)
+        run: >
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App
+          -sdk iphoneos -configuration Release
+          CODE_SIGNING_ALLOWED=NO
+          -derivedDataPath build
+
+      - name: Dong goi Payload/.app -> ipa
+        run: |
+          rm -rf out && mkdir -p out/Payload
+          cp -r build/Build/Products/iphoneos-Release/App.app out/Payload/
+          cd out && zip -r App-unsigned.ipa Payload
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaoChay-iOS-unsigned
+          path: mobile_app/out/App-unsigned.ipa
+          if-no-files-found: error

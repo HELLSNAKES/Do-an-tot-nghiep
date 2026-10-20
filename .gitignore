@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+server/fire_alarm.db
+mobile_app/node_modules/
+mobile_app/ios/App/build/
+mobile_app/out/
+.DS_Store
+Thumbs.db

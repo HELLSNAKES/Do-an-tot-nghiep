@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đăng nhập — Hệ thống báo cháy</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:#0f172a;font-family:Segoe UI,Arial,sans-serif;color:#e2e8f0}
+  .box{background:#1e293b;border:1px solid #334155;border-radius:14px;
+    padding:32px;width:340px}
+  .box h1{margin:0 0 6px;font-size:22px;text-align:center}
+  .box p{margin:0 0 20px;text-align:center;color:#94a3b8;font-size:13px}
+  label{display:block;font-size:13px;color:#94a3b8;margin:12px 0 5px}
+  input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #334155;
+    background:#0f172a;color:#e2e8f0;font-size:14px}
+  input:focus{outline:2px solid #2563eb}
+  button{width:100%;margin-top:18px;padding:11px;border:0;border-radius:8px;
+    background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#1d4ed8}
+  .err{margin-top:12px;background:#450a0a;border:1px solid #ef4444;color:#fca5a5;
+    padding:9px;border-radius:8px;font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<form class="box" method="post" action="/login">
+  <h1>🔥 Báo cháy — Đăng nhập</h1>
+  <p>Vui lòng đăng nhập để xem hệ thống</p>
+  <label for="u">Tên đăng nhập</label>
+  <input id="u" name="username" autocomplete="username" required autofocus>
+  <label for="p">Mật khẩu</label>
+  <input id="p" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit">Đăng nhập</button>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+</form>
+</body>
+</html>

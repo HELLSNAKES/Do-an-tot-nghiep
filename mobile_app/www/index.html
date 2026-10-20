@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Báo cháy ESP32</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --line:#334155;
+    --txt:#e2e8f0; --muted:#94a3b8;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --blue:#2563eb;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  .screen{display:none;min-height:100vh;flex-direction:column}
+  .screen.on{display:flex}
+  button{border:0;border-radius:10px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer}
+  input{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);
+    background:#0b1220;color:var(--txt);font-size:16px}
+  input:focus{outline:2px solid var(--blue)}
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+  .err{margin-top:14px;background:#450a0a;border:1px solid #ef4444;color:#fca5a5;
+    padding:10px;border-radius:9px;font-size:13px;text-align:center}
+  .muted{color:var(--muted)}
+
+  /* ---- Login ---- */
+  #viewLogin{justify-content:center;padding:calc(26px + env(safe-area-inset-top)) 26px calc(26px + env(safe-area-inset-bottom))}
+  .logo{text-align:center;font-size:54px;margin-bottom:4px}
+  h1{margin:0 0 6px;text-align:center;font-size:22px}
+  .sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:10px}
+  .btn-blue{background:var(--blue);color:#fff;width:100%;margin-top:20px}
+  .link{text-align:center;margin-top:16px;color:var(--muted);font-size:13px}
+  .link b{color:#93c5fd;cursor:pointer}
+
+  /* ---- App ---- */
+  header{display:flex;justify-content:space-between;align-items:center;gap:8px;
+      padding:calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left));
+      background:#111c33;border-bottom:1px solid var(--line);
+      position:sticky;top:0;z-index:5}
+  header h2{margin:0;font-size:17px}
+  .iconbtn{background:var(--line);color:var(--txt);padding:8px 12px;font-size:16px}
+  main{padding:14px 14px calc(40px + env(safe-area-inset-bottom));max-width:560px;width:100%;margin:0 auto}
+  #banner{padding:13px 14px;border-radius:11px;font-size:15px;font-weight:700;
+    text-align:center;margin-bottom:12px;border:1px solid var(--line);line-height:1.45}
+  .bg-ok{background:#052e16;border-color:var(--ok)!important;color:#86efac}
+  .bg-warn{background:#3b2503;border-color:var(--warn)!important;color:#fcd34d}
+  .bg-bad{background:#450a0a;border-color:var(--bad)!important;color:#fca5a5;animation:p 1s infinite}
+  .bg-gray{background:#1e293b;color:var(--muted)}
+  @keyframes p{50%{opacity:.6}}
+  .manual{display:flex;gap:9px;margin-bottom:13px}
+  .manual button{flex:1}
+  .btn-red{background:#dc2626;color:#fff}
+  .btn-green{background:#16a34a;color:#fff}
+  .btn-red[disabled],.btn-green[disabled]{background:#334155;color:#64748b}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px}
+  .card .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .card .val{font-size:27px;font-weight:800;margin-top:4px}
+  .card .hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:13px;
+    padding:13px;margin-bottom:14px}
+  .panel h3{margin:0 0 10px;font-size:13.5px;color:var(--muted);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;font-size:12.5px;color:var(--muted)}
+  .chips b{color:var(--txt)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:7px 4px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+  .b-NORMAL{background:#052e16;color:#86efac}
+  .b-WARNING{background:#3b2503;color:#fcd34d}
+  .b-ALARM{background:#450a0a;color:#fca5a5}
+  .net{text-align:center;font-size:12px;color:var(--muted);padding:6px}
+
+  /* ---- Settings ---- */
+  #viewSettings{position:fixed;inset:0;background:#0b1220;z-index:20;overflow:auto;
+      padding:calc(26px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom))}
+  #viewSettings h2{margin-top:0}
+  .btn-gray{background:var(--line);color:var(--txt);width:100%;margin-top:10px}
+  .btn-out{background:#450a0a;color:#fca5a5;width:100%;margin-top:22px}
+  .tok{font-family:Consolas,monospace;font-size:12px;background:#0b1220;
+    border:1px solid var(--line);padding:10px;border-radius:9px;word-break:break-all}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="viewLogin" class="screen on">
+  <div class="logo">🔥</div>
+  <h1>Đăng nhập</h1>
+  <div class="sub">Hệ thống báo cháy ESP32</div>
+  <label>Địa chỉ server</label>
+  <input id="inBase" placeholder="https://baochay.example.com hoặc http://192.168.1.100:5000">
+  <label>Tên đăng nhập</label>
+  <input id="inUser" autocomplete="username" value="admin">
+  <label>Mật khẩu</label>
+  <input id="inPass" type="password" autocomplete="current-password">
+  <button class="btn-blue" onclick="doLogin()">Đăng nhập</button>
+  <div id="loginErr" class="err" style="display:none"></div>
+  <div class="link">Gửi request JSON <b>POST /api/login</b> · nhận <b>app_token</b></div>
+</div>
+
+<!-- ==================== SETTINGS ==================== -->
+<div id="viewSettings" class="screen">
+  <h2>⚙️ Cài đặt</h2>
+  <label>Địa chỉ server (BASE)</label>
+  <input id="setBase">
+  <label>Người dùng</label>
+  <input id="setUser" disabled>
+  <label>App token (X-App-Token)</label>
+  <div class="tok" id="setTok"></div>
+    <button class="btn-gray" style="margin-top:8px" onclick="copyTok()">📋 Sao chép token</button>
+  <label>API đang gọi</label>
+  <div class="tok" id="setApi"></div>
+  <button class="btn-gray" onclick="saveSettings()">Lưu & quay lại</button>
+  <button class="btn-out" onclick="doLogout()">Đăng xuất (xóa token)</button>
+</div>
+
+<!-- ==================== MAIN ==================== -->
+<div id="viewMain" class="screen">
+  <header>
+    <h2>🔥 Báo cháy ESP32</h2>
+    <button class="iconbtn" onclick="openSettings()">⚙️</button>
+  </header>
+  <main>
+    <div id="banner" class="bg-gray">Đang tải dữ liệu...</div>
+
+    <div class="manual">
+      <button class="btn-red" id="btnOn" onclick="manualAlarm('on')">🚨 BÁO CHÁY THỦ CÔNG</button>
+      <button class="btn-green" id="btnAck" onclick="manualAlarm('ack')">⏹ NGỪNG (ACK)</button>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="lbl">🌡️ Nhiệt độ</div>
+        <div class="val" id="vT">--</div><div class="hint">DHT11</div></div>
+      <div class="card"><div class="lbl">💧 Độ ẩm</div>
+        <div class="val" id="vH">--</div><div class="hint">DHT11</div></div>
+      <div class="card"><div class="lbl">🔥 Lửa</div>
+        <div class="val" id="vF">--</div><div class="hint" id="hF">ADC 0–4095</div></div>
+      <div class="card"><div class="lbl">💨 Khói / Gas</div>
+        <div class="val" id="vS">--</div><div class="hint" id="hS">ADC 0–4095</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>📊 THỐNG KÊ HÔM NAY</h3>
+      <div class="chips" id="statChips">--</div>
+    </div>
+
+    <div class="panel">
+      <h3>📋 10 DỮ LIỆU MỚI NHẤT</h3>
+      <table>
+        <thead><tr><th>Thời gian</th><th>Nhiệt</th><th>Khói</th><th>Trạng thái</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="4" style="text-align:center" class="muted">Chưa có dữ liệu</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="net" id="net">● kết nối...</div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// App mobile bao chay - goi API bang X-App-Token (CORS da mo)
+// ============================================================
+const $ = id => document.getElementById(id);
+const S = {
+  base: (localStorage.getItem('bc_base') || 'http://127.0.0.1:5000').replace(/\/+$/,''),
+  tok : localStorage.getItem('bc_token') || '',
+  user: localStorage.getItem('bc_user') || '',
+};
+const TXT = {
+  NORMAL : ['bg-ok',   '✅ AN TOAN — Không phát hiện cháy'],
+  WARNING: ['bg-warn', '⚠️ CẢNH BÁO — Khói/nhiệt độ bất thường'],
+  ALARM  : ['bg-bad',  '🚨 BÁO CHÁY — Còi & bơm đã kích hoạt!']
+};
+let last = null, manual = false, timer1, timer2;
+
+function show(id){
+  ['viewLogin','viewMain','viewSettings'].forEach(v =>
+    $(v).classList.toggle('on', v === id));
+}
+
+// ---------- gọi API chung ----------
+async function api(path, opt = {}) {
+  const r = await fetch(S.base + path, {
+    method: opt.method || 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-App-Token': S.tok,
+      ...(opt.headers || {})
+    },
+    body: opt.body ? JSON.stringify(opt.body) : undefined
+  });
+  if (r.status === 401) { logoutLocal(); throw new Error('401'); }
+  let j = null;
+  try { j = await r.json(); } catch(e) {}
+  if (!r.ok) throw Object.assign(new Error((j && j.error) || ('HTTP ' + r.status)),
+                                 { status: r.status, body: j });
+  return j;
+}
+
+// ---------- login / logout ----------
+async function doLogin() {
+  const base = $('inBase').value.trim() || S.base;
+  const u = $('inUser').value.trim(), p = $('inPass').value;
+  if (!base || !u || !p) return showLoginErr('Điền đủ server / tên / mật khẩu');
+  const url = base.replace(/\/+$/,'');
+  try {
+    const r = await fetch(url + '/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: u, password: p})
+    });
+    const j = await r.json();
+    if (!r.ok) return showLoginErr(j.error || 'Đăng nhập thất bại');
+    S.base = url; S.tok = j.app_token; S.user = j.user;
+    localStorage.setItem('bc_base', S.base);
+    localStorage.setItem('bc_token', S.tok);
+    localStorage.setItem('bc_user', S.user);
+    startApp();
+  } catch (e) {
+    showLoginErr('Không tới được server (' + (e.message || e) + ')');
+  }
+}
+function showLoginErr(m){ const e=$('loginErr'); e.textContent=m; e.style.display='block'; }
+function logoutLocal(){ S.tok=''; localStorage.removeItem('bc_token'); stopPoll(); show('viewLogin'); }
+function doLogout(){ if (confirm('Xóa token và đăng xuất?')) logoutLocal(); }
+
+async function copyTok(){
+  const v = $('setTok').textContent;
+  let ok = false;
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(v); ok = true; } } catch(e){}
+  if (!ok){
+    const ta = document.createElement('textarea');
+    ta.value = v; ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { ok = document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+  alert(ok ? '✔ Đã sao chép token' : '⚠ Chạm giữ ô token phía trên để chọn tay');
+}
+
+function openSettings(){
+  $('setBase').value = S.base;
+  $('setUser').value = S.user;
+  $('setTok').textContent = S.tok || '(chưa đăng nhập)';
+  $('setApi').textContent = S.base + '/api/latest  (header X-App-Token)';
+  show('viewSettings');
+}
+function saveSettings(){
+  const b = $('setBase').value.trim().replace(/\/+$/,'');
+  if (b) { S.base = b; localStorage.setItem('bc_base', b); }
+  startPoll();
+  show('viewMain');
+}
+
+// ---------- dữ liệu ----------
+function setBanner(cls, text){
+  const el = $('banner');
+  el.className = cls;
+  el.textContent = text;
+}
+
+async function refreshLatest(){
+  try {
+    const j = await api('/api/latest');
+    const d = j.data;
+    last = d;
+    $('vT').textContent = d.temperature.toFixed(1) + '°';
+    $('vH').textContent = d.humidity.toFixed(1) + '%';
+    $('vF').textContent = d.flame;
+    $('vS').textContent = d.smoke;
+    $('hF').textContent = d.flame_detected ? '🔴 Có lửa' : '🟢 Không phát hiện';
+    $('hS').textContent = 'Ngưỡng nguy hiểm 2800';
+    const t = TXT[d.state] || TXT.NORMAL;
+    setBanner(t[0], t[1] + '\n' + d.device_id + ' · ' + d.ts.replace('T',' '));
+    $('banner').style.whiteSpace = 'pre-line';
+    $('net').textContent = '● kết nối OK · ' + (new Date().toLocaleTimeString('vi-VN'));
+        if (manual) setBanner('bg-bad', '🚨 BÁO CHÁY THỦ CÔNG (người dùng kích hoạt)');
+      } catch (e) {
+    if (e.status === 404) setBanner('bg-gray', 'Chưa có dữ liệu nào từ thiết bị');
+    else $('net').textContent = '● mất kết nối server';
+  }
+}
+
+async function refreshState(){
+  try {
+    const j = await api('/api/state');
+    manual = !!j.manual_alarm;
+    $('btnOn').disabled = manual;
+    $('btnAck').disabled = !manual;
+    if (manual) setBanner('bg-bad', '🚨 BÁO CHÁY THỦ CÔNG (người dùng kích hoạt)');
+  } catch (e) {}
+}
+
+async function refreshHistory(){
+  try {
+    const j = await api('/api/history?limit=10');
+    const rows = j.data.slice().reverse();
+    $('tbody').innerHTML = rows.length === 0
+      ? '<tr><td colspan="4" style="text-align:center" class="muted">Chưa có dữ liệu</td></tr>'
+      : rows.map(r => `<tr>
+          <td>${r.ts.slice(11,16)} ${r.ts.slice(8,10)}/${r.ts.slice(5,7)}</td>
+          <td>${r.temperature.toFixed(1)}°</td>
+          <td>${r.smoke}</td>
+          <td style="text-align:right"><span class="badge b-${r.state}">${r.state}</span></td>
+        </tr>`).join('');
+  } catch (e) {}
+}
+
+async function refreshStats(){
+  try {
+    const d = (await api('/api/stats')).data;
+    $('statChips').innerHTML = [
+      `Số mẫu: <b>${d.samples||0}</b>`,
+      `Nhiệt TB: <b>${(d.avg_temp||0).toFixed(1)}°C</b>`,
+      `Min/Max: <b>${(d.min_temp??0).toFixed(1)}/${(d.max_temp??0).toFixed(1)}</b>`,
+      `Khói max: <b>${d.max_smoke||0}</b>`,
+      `Báo cháy: <b>${d.alarm_count||0}</b>`
+    ].join(' · ');
+  } catch (e) {}
+}
+
+async function manualAlarm(action){
+  const q = action === 'on'
+    ? 'Bật BÁO CHÁY THỦ CÔNG? Còi+bơm sẽ kích hoạt.'
+    : 'NGỪNG / CHẶN báo cháy?';
+  if (!confirm(q)) return;
+  try {
+    const j = await api('/api/manual', {method:'POST', body:{action}});
+    manual = !!j.manual_alarm;
+    $('btnOn').disabled = manual;
+    $('btnAck').disabled = !manual;
+    await refreshState();
+    await refreshLatest();
+  } catch (e) { alert('Lỗi: ' + (e.message||e)); }
+}
+
+// ---------- poll ----------
+function startPoll(){
+  stopPoll();
+  refreshLatest(); refreshState(); refreshHistory(); refreshStats();
+  timer1 = setInterval(() => { refreshLatest(); refreshState(); }, 3000);
+  timer2 = setInterval(() => { refreshHistory(); refreshStats(); }, 10000);
+}
+function stopPoll(){ clearInterval(timer1); clearInterval(timer2); }
+
+function startApp(){
+  show('viewMain');
+  startPoll();
+}
+
+// khởi động: có token thì vào thẳng app, không thì màn login
+$('inBase').value = S.base;
+if (S.tok) startApp(); else show('viewLogin');
+</script>
+</body>
+</html>
